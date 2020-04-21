@@ -1,0 +1,118 @@
+# GROMACS 2020
+#
+# Contents:
+#   Ubuntu 16.04
+#   CUDA version 10.1
+#   GNU compilers (upstream)
+#   OFED (upstream)
+#   OpenMPI version 3.1.4
+
+BootStrap: docker
+From: nvidia/cuda:10.1-devel-ubuntu16.04
+%post
+    . /.singularity.d/env/10-docker*.sh
+
+# Python
+%post
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python
+    rm -rf /var/lib/apt/lists/*
+
+# GNU compiler
+%post
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        g++ \
+        gcc
+    rm -rf /var/lib/apt/lists/*
+
+# CMake version 3.16.3
+%post
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        make \
+        wget
+    rm -rf /var/lib/apt/lists/*
+%post
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://cmake.org/files/v3.16/cmake-3.16.3-Linux-x86_64.sh
+    mkdir -p /usr/local
+    /bin/sh /var/tmp/cmake-3.16.3-Linux-x86_64.sh --prefix=/usr/local --skip-license
+    rm -rf /var/tmp/cmake-3.16.3-Linux-x86_64.sh
+%environment
+    export PATH=/usr/local/bin:$PATH
+%post
+    export PATH=/usr/local/bin:$PATH
+
+# OFED
+%post
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -t xenial \
+        dapl2-utils \
+        ibutils \
+        ibverbs-utils \
+        infiniband-diags \
+        libdapl-dev \
+        libdapl2 \
+        libibcm-dev \
+        libibcm1 \
+        libibmad-dev \
+        libibmad5 \
+        libibverbs-dev \
+        libibverbs1 \
+        libmlx4-1 \
+        libmlx4-dev \
+        libmlx5-1 \
+        libmlx5-dev \
+        librdmacm-dev \
+        librdmacm1 \
+        rdmacm-utils
+    rm -rf /var/lib/apt/lists/*
+
+# OpenMPI version 3.1.4
+%post
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bzip2 \
+        file \
+        hwloc \
+        libnuma-dev \
+        make \
+        openssh-client \
+        perl \
+        tar \
+        wget
+    rm -rf /var/lib/apt/lists/*
+%post
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.open-mpi.org/software/ompi/v3.1/downloads/openmpi-3.1.4.tar.bz2 && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/openmpi-3.1.4.tar.bz2 -C /var/tmp -j
+    cd /var/tmp/openmpi-3.1.4 &&   ./configure --prefix=/usr/local/openmpi --disable-getpwuid --enable-orterun-prefix-by-default --with-cuda --with-verbs
+    make -j$(nproc)
+    make -j$(nproc) install
+    rm -rf /var/tmp/openmpi-3.1.4.tar.bz2 /var/tmp/openmpi-3.1.4
+%environment
+    export LD_LIBRARY_PATH=/usr/local/openmpi/lib:$LD_LIBRARY_PATH
+    export PATH=/usr/local/openmpi/bin:$PATH
+%post
+    export LD_LIBRARY_PATH=/usr/local/openmpi/lib:$LD_LIBRARY_PATH
+    export PATH=/usr/local/openmpi/bin:$PATH
+
+# http://ftp.gromacs.org/pub/gromacs/gromacs-2020.tar.gz
+%post
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp http://ftp.gromacs.org/pub/gromacs/gromacs-2020.tar.gz && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/gromacs-2020.tar.gz -C /var/tmp -z
+    mkdir -p /var/tmp/gromacs-2020/build && cd /var/tmp/gromacs-2020/build && cmake -DCMAKE_INSTALL_PREFIX=/usr/local/gromacs -D CMAKE_BUILD_TYPE=Release -D CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -D GMX_BUILD_OWN_FFTW=ON -D GMX_GPU=ON -D GMX_MPI=ON -D GMX_OPENMP=ON -D GMX_PREFER_STATIC_LIBS=ON -D MPIEXEC_PREFLAGS=--allow-run-as-root /var/tmp/gromacs-2020
+    cmake --build /var/tmp/gromacs-2020/build --target all -- -j$(nproc)
+    cmake --build /var/tmp/gromacs-2020/build --target install -- -j$(nproc)
+    rm -rf /var/tmp/gromacs-2020 /var/tmp/gromacs-2020.tar.gz
+
+%environment
+    export PATH=$PATH:/usr/local/gromacs/bin
+%post
+    export PATH=$PATH:/usr/local/gromacs/bin
+
+%labels
+    gromacs.version 2020
